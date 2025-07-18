@@ -4,22 +4,30 @@ format: pdf
 editor: visual
 ---
 
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 install.packages("readr")
 install.packages("readxl")
 install.packages("dplyr")
+install.packages("stringr")
+install.packages("tidyr")
 ```
 
 ```{r}
 library(readr)
 library(readxl)
 library(dplyr)
+library(stringr)
+library(tidyr)
 ```
 
 ```{r}
 slo <- read_csv("slo_employment.csv")
 us <- read_csv("us_employment.csv")
-naics_codes <- read_excel("naics_codes.xlsx")
+naics <- read_excel("naics_codes.xlsx", skip = 2) %>%
+  select(2:3) %>%
+  rename(codes = 1, title = 2) %>%
+  mutate(title = str_remove(title, "T$")) %>%
+  drop_na()
 
 slo_sum <- slo %>%
   group_by(industry_code) %>%
