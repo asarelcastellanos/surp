@@ -1,0 +1,63 @@
+---
+title: "Using LQs to Find Top SLO Industries"
+format: pdf
+editor: visual
+---
+
+```{r}
+install.packages("readr")
+install.packages("readxl")
+install.packages("dplyr")
+```
+
+```{r}
+library(readr)
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+slo <- read_csv("slo_employment.csv")
+us <- read_csv("us_employment.csv")
+naics_codes <- read_excel("naics_codes.xlsx")
+
+slo_sum <- slo %>%
+  group_by(industry_code) %>%
+  summarise(emp_slo = sum(month1_emplvl, na.rm = TRUE))
+
+us_sum <- us %>%
+  group_by(industry_code) %>%
+  summarise(emp_us = sum(month1_emplvl, na.rm = TRUE))
+
+lq_data <- slo_sum %>%
+  inner_join(us_sum, by = "industry_code") %>%
+  mutate(share_slo = emp_slo / sum(emp_slo),
+         share_us = emp_us / sum(emp_us),
+         LQ = share_slo / share_us)
+```
+
+#### What are the Top 5 NAICS Sub-Sectors in SLO County based on LQ?
+
+```{r}
+mod_1_lq_data <- lq_data %>%
+  mutate(code_str = as.character(industry_code)) %>%
+  filter(nchar(code_str) == 3) %>%
+  select(industry_code, LQ, code_str) %>%
+  arrange(desc(LQ)) %>%
+  slice_max(LQ, n = 5) %>%
+  print()
+```
+
+#### What are the Top 5 Industries within each Sub-Sector in SLO County based on LQ?
+
+```{r}
+mod_2_lq_data <- lq_data %>%
+  mutate(code_str = as.character(industry_code)) %>%
+  mutate(naics_3digit = substr(industry_code, 1, 3)) %>%
+  group_by(naics_3digit) %>%
+  filter(naics_3digit %in% mod_1_lq_data$code_str) %>%
+  select(industry_code, LQ, naics_3digit) %>%
+  arrange(desc(LQ)) %>%
+  slice_max(LQ, n = 5) %>%
+  print()
+```
