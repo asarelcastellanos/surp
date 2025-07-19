@@ -1,5 +1,5 @@
 ---
-title: "Using LQs to Find Top SLO Industries"
+title: "Top Industries in SLO County Based on Location Quotients"
 format: pdf
 editor: visual
 ---
@@ -12,13 +12,29 @@ install.packages("stringr")
 install.packages("tidyr")
 ```
 
-```{r}
+```{r, echo=FALSE, eval=FALSE}
 library(readr)
 library(readxl)
 library(dplyr)
 library(stringr)
 library(tidyr)
 ```
+
+# Using Location Quotients (LQs) to identify important industries within San Luis Obispo (SLO) County.
+
+This project explore the industrial composition of San Luis Obispo (SLO) County by using **Location Quotients (LQs)** to identify industries that are more concentrated locally compared to the national economy. The purpose is to determine which sub-sectors and industries play a disproportionately significant role in SLO County's economy.
+
+## 1. Loading and Preparing the Data
+
+To begin this process, we loaded three data sets:
+
+-   `naics_codes.xlsx`: provides NAICS industry codes and their titles
+
+    -   This `.xlsx` file is a bit tricky because of the fact there are unnecessary details and format quirks so I had to do a bit of cleaning in order to get codes and titles.
+
+-   `slo_employment.csv`: contains monthly employment levels by industry in SLO County
+
+-   `us_employment.csv`: contains comparable national data
 
 ```{r}
 slo <- read_csv("slo_employment.csv")
@@ -28,7 +44,13 @@ naics <- read_excel("naics_codes.xlsx", skip = 2) %>%
   rename(codes = 1, title = 2) %>%
   mutate(title = str_remove(title, "T$")) %>%
   drop_na()
+```
 
+## 2. Summarizing Employment by Industry
+
+Next, we aggregated employment data fro each industry at the annual level by summing the employment figures for each `industry_code.`
+
+```{r}
 slo_sum <- slo %>%
   group_by(industry_code) %>%
   summarise(emp_slo = sum(month1_emplvl, na.rm = TRUE))
@@ -36,7 +58,23 @@ slo_sum <- slo %>%
 us_sum <- us %>%
   group_by(industry_code) %>%
   summarise(emp_us = sum(month1_emplvl, na.rm = TRUE))
+```
 
+## 3. Calculating Location Quotients (LQs)
+
+We merged the SLO and US employment summaries by industry code and then computed the location quotient:
+
+$$
+LQ_i = \left( \frac{e^{\text{SLO}}_i}{e^{\text{SLO}}} \right) \Big/ \left( \frac{e^{\text{US}}_i}{e^{\text{US}}} \right)
+$$
+
+Where:\
+- ( e\^{\text{SLO}}\_i ) = Employment in industry *i* in **SLO**\
+- ( e\^{\text{SLO}} ) = Total employment in **SLO**\
+- ( e\^{\text{US}}\_i ) = Employment in industry *i* in **US**\
+- ( e\^{\text{US}} ) = Total employment in **US**
+
+```{r}
 lq_data <- slo_sum %>%
   inner_join(us_sum, by = "industry_code") %>%
   mutate(share_slo = emp_slo / sum(emp_slo),
@@ -44,7 +82,11 @@ lq_data <- slo_sum %>%
          LQ = share_slo / share_us)
 ```
 
-#### What are the Top 5 NAICS Sub-Sectors in SLO County based on LQ?
+The LQ tells us whether a given industry is **overrepresented (LQ \> 1)** or **underrepresented (LQ \< 1)** in SLO compared to the national average.
+
+## 4. Identifying Top 5 NAICS Sub-Sectors
+
+We focused on **3-digit NAICS codes**, which represent broad sub-sectors within the economy (e.g. Food Services, Construction). Filtering and sorting by highest LQs helped us identify the **top 10 most concentrated sub-sectors** in SLO County.
 
 ```{r}
 mod_1_lq_data <- lq_data %>%
@@ -56,7 +98,9 @@ mod_1_lq_data <- lq_data %>%
   print()
 ```
 
-#### What are the Top 5 Industries within each Sub-Sector in SLO County based on LQ?
+## 5. Drilling Down: Top Industries Within Each Sub-Sector
+
+For each of the top 5 sub-sectors, we identified the **top 5 detailed industries** (based on full-length NAICS codes) with the highest LQs. This deeper look gives us a finer-grained understanding of what specific industries drive the sub-sector's prominence.
 
 ```{r}
 mod_2_lq_data <- lq_data %>%
